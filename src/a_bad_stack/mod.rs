@@ -77,6 +77,18 @@ impl BadStack {
     }
 }
 
+impl Drop for BadStack {
+    fn drop(&mut self) {
+        let mut tail = mem::replace(&mut self.head, OptionList::Empty);
+        while let OptionList::Populated(mut node) = tail {
+            // Drop from top to bottom of stack
+            // When tail point to next node, no reference to current node
+            // -> current node is dropped
+            tail = mem::replace(&mut node.next, OptionList::Empty);
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
