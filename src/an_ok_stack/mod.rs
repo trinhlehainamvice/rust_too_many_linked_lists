@@ -17,35 +17,6 @@ pub struct OkStack<T> {
     head: OptionList<T>,
 }
 
-// Consume Iterator, mean we can't use OkStack after convert into Iterator
-// Because IntoIter will own OkStack instance.
-pub struct IntoIter<T>(OkStack<T>);
-
-impl<T> Iterator for IntoIter<T> {
-    type Item = T;
-    fn next(&mut self) -> Option<Self::Item> {
-        self.0.pop()
-    }
-}
-
-pub struct Iter<'a, T> {
-    next: Option<&'a Node<T>>,
-    // Prefer &T rather than &Box<T>
-    // Because we can use deref() on &Box<T> to get &T
-    // Reference: https://rust-lang.github.io/rust-clippy/master/index.html#/borrowed_box
-    // next: Option<&'a Box<Node<T>>>
-}
-
-impl<'a, T> Iterator for Iter<'a, T> {
-    type Item = &'a T;
-    fn next(&mut self) -> Option<Self::Item> {
-        self.next.map(|node| {
-            self.next = node.next.as_deref();
-            &node.val
-        })
-    }
-}
-
 impl<T> OkStack<T> {
     pub fn new() -> Self {
         Self { head: None }
@@ -85,7 +56,54 @@ impl<T> OkStack<T> {
     pub fn peek_mut(&mut self) -> Option<&mut T> {
         self.head.as_mut().map(|node| &mut node.val)
     }
+}
 
+// Consume Iterator, mean we can't use OkStack after convert into Iterator
+// Because IntoIter will own OkStack instance.
+pub struct IntoIter<T>(OkStack<T>);
+
+impl<T> Iterator for IntoIter<T> {
+    type Item = T;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.0.pop()
+    }
+}
+
+pub struct Iter<'a, T> {
+    next: Option<&'a Node<T>>,
+    // Prefer &T rather than &Box<T>
+    // Because we can use deref() on &Box<T> to get &T
+    // Reference: https://rust-lang.github.io/rust-clippy/master/index.html#/borrowed_box
+    // next: Option<&'a Box<Node<T>>>
+}
+
+impl<'a, T> Iterator for Iter<'a, T> {
+    type Item = &'a T;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.next.map(|node| {
+            self.next = node.next.as_deref();
+            // We can write as below by explicitly declare turbofish type [::<U, _>] that we want to transform to
+            // self.next = node.next.as_ref().map::<&Node<T>, _>(|node| node);
+            &node.val
+        })
+    }
+}
+
+pub struct IterMut<'a, T> {
+    next: Option<&'a mut Node<T>>,
+}
+
+impl<'a, T> Iterator for IterMut<'a, T> {
+    type Item = &'a mut T;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.next.take().map(|node| {
+            self.next = node.next.as_deref_mut();
+            &mut node.val
+        })
+    }
+}
+
+impl<T> OkStack<T> {
     pub fn into_iter(self) -> IntoIter<T> {
         IntoIter(self)
     }
@@ -97,6 +115,12 @@ impl<T> OkStack<T> {
     pub fn iter(&self) -> Iter<T> {
         Iter {
             next: self.head.as_deref(),
+        }
+    }
+
+    pub fn iter_mut(&mut self) -> IterMut<T> {
+        IterMut {
+            next: self.head.as_deref_mut(),
         }
     }
 }
@@ -130,11 +154,16 @@ mod tests {
         assert_eq!(iter.next(), None);
         println!("{:?}", list);
 
+        for next in list.iter_mut() {
+            *next += 1;
+        }
+        println!("{:?}", list);
+
         let mut iter = list.into_iter();
+        assert_eq!(iter.next(), Some(4));
         assert_eq!(iter.next(), Some(3));
         assert_eq!(iter.next(), Some(2));
         assert_eq!(iter.next(), Some(1));
-        assert_eq!(iter.next(), Some(0));
         assert_eq!(iter.next(), None);
     }
 }
