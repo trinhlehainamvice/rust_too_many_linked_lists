@@ -1,4 +1,4 @@
-use std::cell::{Ref, RefCell};
+use std::cell::{Ref, RefCell, RefMut};
 use std::rc::Rc;
 
 struct Node<T> {
@@ -44,6 +44,28 @@ impl<T> List<T> {
         self.len += 1;
     }
 
+    pub fn push_back(&mut self, val: T) {
+        let new_tail = Rc::new(RefCell::new(Node {
+            val,
+            next: None,
+            prev: None,
+        }));
+
+        match self.tail.take() {
+            Some(old_tail) => {
+                old_tail.borrow_mut().next = Some(new_tail.clone());
+                new_tail.borrow_mut().prev = Some(old_tail);
+                self.tail = Some(new_tail);
+            }
+            _ => {
+                self.head = Some(new_tail.clone());
+                self.tail = Some(new_tail);
+            }
+        }
+
+        self.len += 1;
+    }
+
     pub fn pop_front(&mut self) -> Option<T> {
         self.head.take().map(|old_head| {
             match old_head.borrow_mut().next.take() {
@@ -60,15 +82,50 @@ impl<T> List<T> {
         })
     }
 
+    pub fn pop_back(&mut self) -> Option<T> {
+        self.tail.take().map(|old_tail| {
+            match old_tail.borrow_mut().prev.take() {
+                Some(new_tail) => {
+                    new_tail.borrow_mut().next.take();
+                    self.tail = Some(new_tail);
+                }
+                _ => {
+                    self.head.take();
+                }
+            }
+
+            self.len -= 1;
+            Rc::try_unwrap(old_tail).ok().unwrap().into_inner().val
+        })
+    }
+
     pub fn front(&self) -> Option<Ref<T>> {
         self.head
-            .as_deref()
+            .as_ref()
             // borrowed value by RefCell::borrow() return a Ref<'_, T> which has a same lifetime with owner
             // so can't reference to borrowed value if that's owner is dropped in this scope
             // mean same case with return a reference to data created inside a function or closure
             // .map(|node| &node.borrow().val)
             // TODO: need more research
             .map(|node| Ref::map(node.borrow(), |node| &node.val))
+    }
+
+    pub fn back(&self) -> Option<Ref<T>> {
+        self.tail
+            .as_ref()
+            .map(|node| Ref::map(node.borrow(), |node| &node.val))
+    }
+
+    pub fn front_mut(&mut self) -> Option<RefMut<T>> {
+        self.head
+            .as_ref()
+            .map(|node| RefMut::map(node.borrow_mut(), |node| &mut node.val))
+    }
+
+    pub fn back_mut(&mut self) -> Option<RefMut<T>> {
+        self.tail
+            .as_ref()
+            .map(|node| RefMut::map(node.borrow_mut(), |node| &mut node.val))
     }
 }
 
@@ -88,8 +145,16 @@ mod tests {
         list.push_front(1);
         list.push_front(2);
         list.push_front(3);
+        assert_eq!(*list.front().unwrap(), 3);
+        assert_eq!(*list.back().unwrap(), 1);
+        list.push_back(4);
+        *list.back_mut().unwrap() = 5;
         assert_eq!(list.pop_front(), Some(3));
+        assert_eq!(list.pop_back(), Some(5));
+        assert_eq!(*list.back().unwrap(), 1);
+        assert_eq!(*list.front().unwrap(), 2);
         assert_eq!(list.pop_front(), Some(2));
+        assert_eq!(*list.front().unwrap(), 1);
         assert_eq!(list.pop_front(), Some(1));
         assert_eq!(list.pop_front(), None);
     }
