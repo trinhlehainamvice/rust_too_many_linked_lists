@@ -63,6 +63,21 @@ impl<'a, T> Iterator for Iter<'a, T> {
     }
 }
 
+impl<T> Drop for List<T> {
+    fn drop(&mut self) {
+        let mut tail = self.head.take();
+        while let Some(node) = tail {
+            // Rc::try_unwrap will take ownership of the node if there is only one strong reference count
+            match Rc::try_unwrap(node) {
+                Ok(mut node) => tail = node.next.take(),
+                _ => break,
+            }
+
+            // tail = node.next.clone();
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
