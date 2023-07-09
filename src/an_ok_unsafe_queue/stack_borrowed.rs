@@ -166,11 +166,12 @@ mod tests {
             // let anonymous1_mut_ref_data = &mut data;
             // let ptr4 = &mut *anonymous1_mut_ref_data;
             // Borrow Stack: [anonymous1_mut_ref_data]
-            let ptr4: *mut _ = &mut data;
-            let ref2 = &mut *ptr4;
+            // let ptr4: *mut _ = &mut data;
+            // let ref2 = &mut *ptr4;
+            // *ref2 += 10;
+            // *ptr4 += 10;
+            //
 
-            *ref2 += 10;
-            *ptr4 += 10;
             // Ref1 is popped from Borrow Stack
             *ref1 += 10;
             // Point to anonymous0_mut_ref_data, which popped from Borrow Stack
@@ -180,6 +181,34 @@ mod tests {
             //
 
             assert_eq!(data, 40);
+        }
+    }
+
+    #[test]
+    fn test_shared_references() {
+        fn opaque_read(val: &i32) {
+            println!("{}", val);
+        }
+
+        unsafe {
+            let mut data = 10;
+            let mut_ref = &mut data;
+            let ptr1 = mut_ref as *mut i32;
+            // When we immutably reference (aka shared reference) to a mutable reference or raw_pointer
+            // Rust push shared reference to Borrow Stack as Shared Read Only Reference
+            let shared_ref1 = &*mut_ref;
+            // Same as above even we cast to *mut as last, but we cast to *const first
+            // So Rust assume that this is a immutable reference (aka shared reference)
+            // And push shared reference to Borrow Stack
+            let ptr2 = shared_ref1 as *const i32 as *mut i32;
+            // Borrow Stack: [ptr2(point to shared reference) -> shared_ref1 -> ptr1 -> mut_ref]
+
+            opaque_read(&*ptr2);
+            opaque_read(shared_ref1);
+            *ptr1 += 1;
+            *mut_ref += 1;
+
+            opaque_read(&data);
         }
     }
 }
