@@ -1,6 +1,7 @@
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::ops::{Deref, DerefMut};
 
     #[test]
     fn test1() {
@@ -209,6 +210,66 @@ mod tests {
             *mut_ref += 1;
 
             opaque_read(&data);
+        }
+    }
+
+    #[test]
+    fn test_interior_mutability() {
+        fn opaque_read(val: &i32) {
+            println!("{}", val);
+        }
+
+        use std::cell::UnsafeCell;
+
+        unsafe {
+            /*
+            let mut data: UnsafeCell<i32> = UnsafeCell::new(10);
+            ** Because we reference the element inside UnsafeCell
+            ** Rust can't make assume that element is can be interior mutability
+            ** So to take advantage of interior mutability, we use reference to UnsafeCell not element inside it
+            let mut_ref = data.get_mut();
+            let ptr1 = mut_ref as *mut i32;
+            let shared_ref1 = &*mut_ref;
+
+            opaque_read(shared_ref1);
+            *ptr1 += 1;
+            *mut_ref += 1;
+            assert_eq!(*data.get(), 12);
+            */
+
+            let mut data = UnsafeCell::new(10);
+            let mut_ref = &mut data;
+            let ptr1 = mut_ref.get();
+            let shared_ref1 = &*mut_ref;
+
+            *ptr1 += 1;
+            // *: mean access to location that point to
+            // &: write down address of an element that marked this
+            // so when we look at some difficult marks like &**, just analyze from left to right
+            opaque_read(&*shared_ref1.get());
+            *mut_ref.get() += 1;
+            assert_eq!(*data.get(), 12);
+        }
+    }
+
+    #[test]
+    fn test_box() {
+        fn opaque_read(val: &i32) {
+            println!("{}", val);
+        }
+
+        unsafe {
+            let mut data = Box::new(10);
+            let mut_ref = &mut data;
+            let ptr1 = mut_ref as *mut Box<i32>;
+            let shared_ref1 = &*mut_ref;
+
+            // *(*ptr1).deref_mut() += 1;
+            opaque_read((*ptr1).deref());
+            opaque_read(shared_ref1.deref());
+            *mut_ref.deref_mut() += 1;
+
+            assert_eq!(*data, 11);
         }
     }
 }
