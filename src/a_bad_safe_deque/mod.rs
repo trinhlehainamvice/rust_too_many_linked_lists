@@ -163,7 +163,7 @@ impl<T> List<T> {
 */
 
 // TODO: research
-/* struct Iter<'a, T>(Option<Ref<'a, Node<T>>);
+/* struct Iter<'a, T>(Option<Ref<'a, Node<T>>>);
    With Ref version, even though we can define lifetime
    We still can't handle borrow properly
 */
