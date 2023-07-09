@@ -142,4 +142,44 @@ mod tests {
             assert_eq!(data[0], 40);
         }
     }
+
+    #[test]
+    fn test6() {
+        unsafe {
+            let mut data = 0;
+            // ptr1 is a raw pointer point to reference to data
+            // NOTE: this is just personal opinion
+            // When explicitly reference to a data instance through raw pointer [not by a reference]
+            // Rust create a an anonymous reference and point raw pointer to it, and push anonymous reference to Borrow Stack
+            // let anonymous0_mut_ref_data = &mut data;
+            // let ptr1 = &mut *anonymous0_mut_ref_data;
+            // Borrow Stack: [anonymous0_mut_ref_data]
+            let ptr1: *mut _ = &mut data;
+            let ptr2 = ptr1;
+            let ptr3 = ptr2.add(0);
+            // Push ref1 to Borrow Stack
+            // Borrow Stack: [anonymous0_mut_ref_data -> ref1]
+            let ref1 = &mut *ptr3;
+
+            // But when we explicitly reference to that instance again
+            // Rust will empty stack an create new anonymous reference
+            // let anonymous1_mut_ref_data = &mut data;
+            // let ptr4 = &mut *anonymous1_mut_ref_data;
+            // Borrow Stack: [anonymous1_mut_ref_data]
+            let ptr4: *mut _ = &mut data;
+            let ref2 = &mut *ptr4;
+
+            *ref2 += 10;
+            *ptr4 += 10;
+            // Ref1 is popped from Borrow Stack
+            *ref1 += 10;
+            // Point to anonymous0_mut_ref_data, which popped from Borrow Stack
+            *ptr3 += 10;
+            *ptr1 += 10;
+            *ptr2 += 10;
+            //
+
+            assert_eq!(data, 40);
+        }
+    }
 }
