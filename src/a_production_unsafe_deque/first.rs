@@ -36,9 +36,6 @@ impl<T> List<T> {
                 (*old_head.as_ptr()).prev = Some(new_head);
                 (*new_head.as_ptr()).next = Some(old_head);
             } else {
-                debug_assert!(self.tail.is_none());
-                debug_assert!(self.head.is_none());
-                debug_assert!(self.len == 0);
                 self.tail = Some(new_head);
             }
 
@@ -59,9 +56,6 @@ impl<T> List<T> {
                 (*old_tail.as_ptr()).next = Some(new_tail);
                 (*new_tail.as_ptr()).prev = Some(old_tail);
             } else {
-                debug_assert!(self.head.is_none());
-                debug_assert!(self.tail.is_none());
-                debug_assert!(self.len == 0);
                 self.head = Some(new_tail);
             }
 
@@ -81,7 +75,6 @@ impl<T> List<T> {
                         Some(new_head)
                     }
                     None => {
-                        debug_assert!(self.len == 1);
                         self.tail = None;
                         None
                     }
@@ -104,7 +97,6 @@ impl<T> List<T> {
                         Some(new_tail)
                     }
                     None => {
-                        debug_assert!(self.len == 1);
                         self.head = None;
                         None
                     }
@@ -116,10 +108,204 @@ impl<T> List<T> {
         }
     }
 
+    pub fn front(&self) -> Option<&T> {
+        unsafe { self.head.as_ref().map(|node| &(*node.as_ptr()).val) }
+    }
+
+    pub fn back(&self) -> Option<&T> {
+        unsafe { self.tail.as_ref().map(|node| &(*node.as_ptr()).val) }
+    }
+
+    pub fn front_mut(&mut self) -> Option<&mut T> {
+        unsafe { self.head.as_mut().map(|node| &mut (*node.as_ptr()).val) }
+    }
+
+    pub fn back_mut(&mut self) -> Option<&mut T> {
+        unsafe { self.tail.as_mut().map(|node| &mut (*node.as_ptr()).val) }
+    }
+
     pub fn len(&self) -> usize {
         self.len
     }
 }
+
+impl<T> Drop for List<T> {
+    fn drop(&mut self) {
+        while self.pop_front().is_some() {}
+    }
+}
+
+struct IntoIter<T>(List<T>);
+
+impl<T> Iterator for IntoIter<T> {
+    type Item = T;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.0.pop_front()
+    }
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (self.0.len, Some(self.0.len))
+    }
+}
+
+impl<T> DoubleEndedIterator for IntoIter<T> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        self.0.pop_back()
+    }
+}
+
+impl<T> ExactSizeIterator for IntoIter<T> {
+    fn len(&self) -> usize {
+        self.0.len
+    }
+}
+
+struct Iter<'a, T> {
+    head: Option<NonNull<Node<T>>>,
+    tail: Option<NonNull<Node<T>>>,
+    len: usize,
+    _marker: PhantomData<&'a T>,
+}
+
+impl<'a, T> Iterator for Iter<'a, T> {
+    type Item = &'a T;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.head.map(|node| {
+            if self.len > 0 {
+                self.len -= 1;
+            }
+            unsafe {
+                self.head = (*node.as_ptr()).next;
+                &(*node.as_ptr()).val
+            }
+        })
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (self.len, Some(self.len))
+    }
+}
+
+impl<'a, T> DoubleEndedIterator for Iter<'a, T> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        self.tail.map(|node| {
+            if self.len > 0 {
+                self.len -= 1;
+            }
+            unsafe {
+                self.tail = (*node.as_ptr()).prev;
+                &(*node.as_ptr()).val
+            }
+        })
+    }
+}
+
+impl<'a, T> ExactSizeIterator for Iter<'a, T> {
+    fn len(&self) -> usize {
+        self.len
+    }
+}
+
+struct IterMut<'a, T> {
+    head: Option<NonNull<Node<T>>>,
+    tail: Option<NonNull<Node<T>>>,
+    len: usize,
+    _marker: PhantomData<&'a mut T>,
+}
+
+impl<'a, T> Iterator for IterMut<'a, T> {
+    type Item = &'a mut T;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.head.map(|node| {
+            if self.len > 0 {
+                self.len -= 1;
+            }
+            unsafe {
+                self.head = (*node.as_ptr()).next;
+                &mut (*node.as_ptr()).val
+            }
+        })
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (self.len, Some(self.len))
+    }
+}
+
+impl<'a, T> DoubleEndedIterator for IterMut<'a, T> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        self.tail.map(|node| {
+            if self.len > 0 {
+                self.len -= 1;
+            }
+            unsafe {
+                self.tail = (*node.as_ptr()).prev;
+                &mut (*node.as_ptr()).val
+            }
+        })
+    }
+}
+
+impl<'a, T> ExactSizeIterator for IterMut<'a, T> {
+    fn len(&self) -> usize {
+        self.len
+    }
+}
+
+impl<T> List<T> {
+    pub fn into_iter(self) -> IntoIter<T> {
+        IntoIter(self)
+    }
+
+    pub fn iter(&self) -> Iter<T> {
+        Iter {
+            head: self.head,
+            tail: self.tail,
+            len: self.len,
+            _marker: PhantomData,
+        }
+    }
+
+    pub fn iter_mut(&mut self) -> IterMut<T> {
+        IterMut {
+            head: self.head,
+            tail: self.tail,
+            len: self.len,
+            _marker: PhantomData,
+        }
+    }
+}
+
+// IntoIterator auto deduced a List to a iterator
+// for _ in list <=> for _ in list.into_iter()
+impl<T> IntoIterator for List<T> {
+    type Item = T;
+    type IntoIter = IntoIter<T>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.into_iter()
+    }
+}
+
+// for _ in &list <=> for _ in list.iter()
+impl<'a, T> IntoIterator for &'a List<T> {
+    type Item = &'a T;
+    type IntoIter = Iter<'a, T>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
+// for _ in &mut list <=> for _ in list.iter_mut()
+impl<'a, T> IntoIterator for &'a mut List<T> {
+    type Item = &'a mut T;
+    type IntoIter = IterMut<'a, T>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter_mut()
+    }
+}
+//
 
 #[cfg(test)]
 mod tests {
@@ -127,19 +313,48 @@ mod tests {
 
     #[test]
     fn test() {
+        println!("test a_production_unsafe_deque::first::tests::test");
+
         let mut list = List::new();
         list.push_front(1);
         list.push_front(2);
         list.push_front(3);
         assert_eq!(list.len(), 3);
-        assert_eq!(list.pop_front(), Some(3));
+        if let Some(front) = list.front_mut() {
+            *front += 10;
+        }
+        assert_eq!(list.pop_front(), Some(13));
         list.push_back(4);
-        assert_eq!(list.pop_back(), Some(4));
+        if let Some(back) = list.back_mut() {
+            *back += 10;
+        }
+        assert_eq!(list.pop_back(), Some(14));
         assert_eq!(list.pop_back(), Some(1));
         assert_eq!(list.len(), 1);
         assert_eq!(list.pop_front(), Some(2));
         assert_eq!(list.len(), 0);
         assert_eq!(list.pop_front(), None);
         assert_eq!(list.len(), 0);
+
+        list.push_front(3);
+        list.push_front(2);
+        list.push_front(4);
+        list.push_front(1);
+        list.push_back(5);
+
+        for i in &mut list {
+            *i += 10;
+        }
+
+        for i in &list {
+            println!("{}", i);
+        }
+
+        let mut iter = list.into_iter();
+        assert_eq!(iter.next(), Some(11));
+        assert_eq!(iter.next_back(), Some(15));
+        assert_eq!(iter.next_back(), Some(13));
+        assert_eq!(iter.next(), Some(14));
+        assert_eq!(iter.next(), Some(12));
     }
 }
