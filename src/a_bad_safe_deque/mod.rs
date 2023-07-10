@@ -34,14 +34,13 @@ impl<T> List<T> {
             Some(old_head) => {
                 old_head.borrow_mut().prev = Some(new_head.clone());
                 new_head.borrow_mut().next = Some(old_head);
-                self.head = Some(new_head);
             }
-            None => {
+            _ => {
                 self.tail = Some(new_head.clone());
-                self.head = Some(new_head);
             }
         }
 
+        self.head = Some(new_head);
         self.len += 1;
     }
 
