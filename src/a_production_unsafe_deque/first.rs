@@ -1,7 +1,6 @@
 use std::fmt::Debug;
 use std::hash::{Hash, Hasher};
 use std::marker::PhantomData;
-use std::mem;
 use std::ptr::NonNull;
 
 struct Node<T> {
@@ -174,6 +173,7 @@ struct Iter<'a, T> {
     head: Option<NonNull<Node<T>>>,
     tail: Option<NonNull<Node<T>>>,
     len: usize,
+    // NOTE: PhantomData pretend this struct own reference to T with 'a lifetime
     _phantom: PhantomData<&'a T>,
 }
 
@@ -1151,7 +1151,11 @@ mod tests {
         );
     }
 
-    fn check_links<T>(_list: &LinkedList<T>) {
-        // would be good to do this!
+    fn check_links<T: Eq + Debug>(list: &LinkedList<T>) {
+        let from_front: Vec<_> = list.iter().collect();
+        let from_back: Vec<_> = list.iter().rev().collect();
+        let re_reved: Vec<_> = from_back.into_iter().rev().collect();
+
+        assert_eq!(from_front, re_reved);
     }
 }
