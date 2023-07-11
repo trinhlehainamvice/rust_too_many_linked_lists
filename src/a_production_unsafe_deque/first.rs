@@ -546,9 +546,10 @@ impl<'a, T> CursoMut<'a, T> {
                 }
 
                 self.list.tail = Some(cur);
+                let ret_index = self.list.len - index - 1;
                 self.list.len = index + 1;
 
-                (self.list.len - (index + 1), ret_head, ret_tail)
+                (ret_index, ret_head, ret_tail)
             },
             _ => {
                 let len = self.list.len;
@@ -1137,18 +1138,17 @@ mod tests {
         assert_eq!(cursor.index().unwrap(), 6);
         assert_eq!(cursor.current().unwrap(), &mut 101);
         let tmp = cursor.split_after();
-        // assert_eq!(tmp.len(), 8);
-        /*        assert_eq!(
-                    tmp.into_iter().collect::<Vec<_>>(),
-                    &[102, 103, 8, 2, 3, 4, 5, 6]
-                );
-        */
+        assert_eq!(tmp.len(), 8);
+        assert_eq!(
+            tmp.into_iter().collect::<Vec<_>>(),
+            &[102, 103, 8, 2, 3, 4, 5, 6]
+        );
+
         check_links(&m);
-        /*        assert_eq!(
-                    m.iter().cloned().collect::<Vec<_>>(),
-                    &[200, 201, 202, 203, 1, 100, 101]
-                );
-        */
+        assert_eq!(
+            m.iter().cloned().collect::<Vec<_>>(),
+            &[200, 201, 202, 203, 1, 100, 101]
+        );
     }
 
     fn check_links<T>(_list: &LinkedList<T>) {
